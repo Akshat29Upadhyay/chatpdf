@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { writeFile } from 'fs/promises';
+import path from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,10 +25,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size too large' }, { status: 400 });
     }
 
-    // For now, just validate and accept the file
-    // In a real app, you'd save it to storage (S3, etc.) and extract text
+    // Read file buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Generate unique file ID and save to /tmp
+    const fileId = `${userId}_${Date.now()}`;
+    const filePath = path.join('/tmp', `${fileId}.pdf`);
+    await writeFile(filePath, buffer);
+
     const fileInfo = {
-      id: Date.now().toString(),
+      id: fileId,
       name: file.name,
       size: file.size,
       uploadedAt: new Date().toISOString(),
@@ -38,6 +47,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       file: fileInfo,
+      fileId: fileId, // Return fileId for future chat
       message: 'PDF uploaded successfully'
     });
 
