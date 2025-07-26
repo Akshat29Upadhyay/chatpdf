@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Send, Upload } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -208,15 +209,34 @@ export default function ChatInterface() {
                   key={message.id}
                   className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`rounded-lg p-3 max-w-xs ${
+                  <div className={`rounded-lg p-3 max-w-xs lg:max-w-lg xl:max-w-xl ${
                     message.isUser
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-800'
                   }`}>
-                    <p className="text-sm">{message.text}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {message.time}
-                    </p>
+                    {message.isUser ? (
+                      <p className="text-sm">{message.text}</p>
+                    ) : (
+                      <div className="text-sm prose prose-sm max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-base font-semibold mb-2">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                            p: ({children}) => <p className="mb-2">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
+                            li: ({children}) => <li className="text-sm leading-tight">{children}</li>,
+                            strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+                            em: ({children}) => <em className="italic">{children}</em>,
+                            code: ({children}) => <code className="bg-gray-200 px-1 py-0.5 rounded text-xs">{children}</code>,
+                            blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 pl-2 italic">{children}</blockquote>,
+                          }}
+                        >
+                          {message.text}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
