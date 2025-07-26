@@ -26,7 +26,7 @@ export default function ChatInterface() {
   const [status, setStatus] = useState<string>('');
   const [uploadStatus, setUploadStatus] = useState<string>('');
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
-  const [uploadedFileId, setUploadedFileId] = useState<string>('');
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -44,7 +44,7 @@ export default function ChatInterface() {
 
     setUploadStatus('');
     setUploadedFileName('');
-    setUploadedFileId('');
+    setUploadedFileUrl('');
 
     if (file.type !== 'application/pdf') {
       setUploadStatus('Please upload a PDF file.');
@@ -73,8 +73,8 @@ export default function ChatInterface() {
       const data = await response.json();
       setUploadStatus('Upload successful!');
       setUploadedFileName(file.name);
-      if (data.fileId) {
-        setUploadedFileId(data.fileId);
+      if (data.fileUrl) {
+        setUploadedFileUrl(data.fileUrl);
       }
     } catch (error) {
       setUploadStatus('Upload failed.');
@@ -106,7 +106,7 @@ export default function ChatInterface() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userMessage.text, fileId: uploadedFileId }),
+        body: JSON.stringify({ message: userMessage.text, fileUrl: uploadedFileUrl }),
       });
 
       if (!response.ok) {

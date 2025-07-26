@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
-// In-memory PDF store (global for serverless)
-declare global {
-  // eslint-disable-next-line no-var
-  var pdfStore: Record<string, string>;
-}
-if (!globalThis.pdfStore) {
-  globalThis.pdfStore = {};
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -32,29 +23,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size too large' }, { status: 400 });
     }
 
-    // Read file buffer and store as base64 in memory
+    // Read file buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
 
-    // Generate unique file ID
-    const fileId = `${userId}_${Date.now()}`;
-    globalThis.pdfStore[fileId] = base64;
+    // Upload to Uploadcare
+    const uploadcareKey = process.env.UPLOADCARE_PUBLIC_KEY;
+    if (!uploadcareKey) {
+      return NextResponse.json({ error: 'Uploadcare public key not set' }, { status: 500 });
+    }
+
+    const uploadForm = new FormData();
+    uploadForm.append('UPLOADCARE_STORE', '1');
+    uploadForm.append('UPLOADCARE_PUB_KEY', uploadcareKey);
+    uploadForm.append('file', new Blob([buffer]), file.name);
+
+    const uploadRes = await fetch('https://upload.uploadcare.com/base/', {
+      method: 'POST',
+      body: uploadForm,
+    });
+    if (!uploadRes.ok) {
+      const error = await uploadRes.text();
+      return NextResponse.json({ error: 'Uploadcare upload failed: ' + error }, { status: 500 });
+    }
+    const uploadData = await uploadRes.json();
+    const fileId = uploadData.file;
+    const fileUrl = `https://ucarecdn.com/${fileId}/${encodeURIComponent(file.name)}`;
 
     const fileInfo = {
       id: fileId,
       name: file.name,
       size: file.size,
       uploadedAt: new Date().toISOString(),
-      userId: userId
+      userId: userId,
+      fileUrl: fileUrl
     };
 
-    console.log('PDF uploaded (in-memory):', fileInfo);
+    console.log('PDF uploaded to Uploadcare:', fileInfo);
 
     return NextResponse.json({ 
       success: true, 
       file: fileInfo,
-      fileId: fileId, // Return fileId for future chat
+      fileUrl: fileUrl, // Return fileUrl for future chat
       message: 'PDF uploaded successfully'
     });
 

@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-// import fs from 'fs/promises';
-// import path from 'path';
-
-declare global {
-  // eslint-disable-next-line no-var
-  var pdfStore: Record<string, string>;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,20 +8,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { message, fileId } = await request.json();
+    const { message, fileUrl } = await request.json();
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
     let aiResponse = null;
 
-    // If fileId is present, use Gemini multimodal
-    if (fileId && process.env.GEMINI_API_KEY) {
+    // If fileUrl is present, fetch the PDF, convert to base64, and send as inlineData to Gemini
+    if (fileUrl && process.env.GEMINI_API_KEY) {
       try {
-        const pdfBase64 = globalThis.pdfStore?.[fileId];
-        if (!pdfBase64) {
-          return NextResponse.json({ error: 'PDF not found in memory. Please re-upload.' }, { status: 400 });
+        // Fetch the PDF from Uploadcare
+        const pdfRes = await fetch(fileUrl);
+        if (!pdfRes.ok) {
+          throw new Error('Failed to fetch PDF from Uploadcare');
         }
+        const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+        const pdfBase64 = pdfBuffer.toString('base64');
         const contents = [
           {
             parts: [
@@ -61,7 +57,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If no fileId or Gemini fails, fallback to OpenAI/Gemini as before
+    // If no fileUrl or Gemini fails, fallback to OpenAI/Gemini as before
     if (!aiResponse) {
       // Try OpenAI first
       if (process.env.OPENAI_API_KEY) {
