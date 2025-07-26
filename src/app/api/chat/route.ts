@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import fs from 'fs/promises';
-import path from 'path';
+// import fs from 'fs/promises';
+// import path from 'path';
+
+declare global {
+  // eslint-disable-next-line no-var
+  var pdfStore: Record<string, string>;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,9 +25,10 @@ export async function POST(request: NextRequest) {
     // If fileId is present, use Gemini multimodal
     if (fileId && process.env.GEMINI_API_KEY) {
       try {
-        const filePath = path.join('/tmp', `${fileId}.pdf`);
-        const pdfBuffer = await fs.readFile(filePath);
-        const pdfBase64 = pdfBuffer.toString('base64');
+        const pdfBase64 = globalThis.pdfStore?.[fileId];
+        if (!pdfBase64) {
+          return NextResponse.json({ error: 'PDF not found in memory. Please re-upload.' }, { status: 400 });
+        }
         const contents = [
           {
             parts: [
