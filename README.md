@@ -1,24 +1,65 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Features
+
+- 🔐 **Authentication**: Secure user authentication with Clerk
+- 📄 **PDF Upload**: Upload and process PDF documents
+- 🤖 **AI Chat**: Chat with your PDFs using Google's Gemini AI
+- 💬 **Real-time Chat**: Interactive chat interface for PDF conversations
+- 📱 **Responsive Design**: Works on desktop and mobile devices
+
 ## Getting Started
 
-First, run the development server:
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Environment Setup
+
+Create a `.env.local` file in the root directory and add your API keys:
+
+```env
+# Gemini API Key
+# Get your API key from: https://makersuite.google.com/app/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Clerk Configuration (if not already set)
+# NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+# CLERK_SECRET_KEY=your_clerk_secret_key
+```
+
+### 3. Get Gemini API Key
+
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Sign in with your Google account
+3. Create a new API key
+4. Copy the key and add it to your `.env.local` file
+
+### 4. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How to Use
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Sign In**: Use the login button to authenticate with Clerk
+2. **Upload PDF**: Click "Go to Chats" and upload a PDF file (max 10MB)
+3. **Start Chatting**: Ask questions about your PDF in natural language
+4. **Get AI Responses**: The Gemini AI will analyze your PDF and provide helpful answers
+
+## Technology Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Styling**: Tailwind CSS
+- **Authentication**: Clerk
+- **AI**: Google Gemini API
+- **PDF Processing**: PDF.js
+- **UI Components**: shadcn/ui
 
 ## Learn More
 
