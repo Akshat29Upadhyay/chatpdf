@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { storePDFChunks } from '@/lib/pinecone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +61,24 @@ export async function POST(request: NextRequest) {
     };
 
     console.log('PDF uploaded to Uploadcare:', fileInfo);
+
+    // Store PDF chunks in Pinecone (if Pinecone is configured)
+    console.log('Checking Pinecone configuration...');
+    console.log('PINECONE_API_KEY exists:', !!process.env.PINECONE_API_KEY);
+    console.log('PINECONE_INDEX_NAME:', process.env.PINECONE_INDEX_NAME);
+    
+    if (process.env.PINECONE_API_KEY) {
+      try {
+        console.log('Starting Pinecone storage...');
+        await storePDFChunks(fileId, userId, file.name, buffer);
+        console.log('PDF chunks stored in Pinecone successfully');
+      } catch (pineconeError) {
+        console.error('Pinecone storage failed:', pineconeError);
+        // Don't fail the upload if Pinecone fails
+      }
+    } else {
+      console.log('Pinecone API key not found, skipping Pinecone storage');
+    }
 
     return NextResponse.json({ 
       success: true, 

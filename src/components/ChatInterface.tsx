@@ -76,7 +76,7 @@ export default function ChatInterface() {
       if (data.fileUrl) {
         setUploadedFileUrl(data.fileUrl);
       }
-    } catch (error) {
+    } catch {
       setUploadStatus('Upload failed.');
     } finally {
       setIsLoading(false);

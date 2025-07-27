@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { searchChunks } from '@/lib/pinecone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,23 @@ export async function POST(request: NextRequest) {
     }
 
     let aiResponse = null;
+    let contextFromPinecone = '';
+
+    // Try to get relevant context from Pinecone first
+    if (process.env.PINECONE_API_KEY) {
+      try {
+        const relevantChunks = await searchChunks(message, userId, 3);
+        if (relevantChunks.length > 0) {
+          contextFromPinecone = `\n\nRelevant information from your documents:\n${relevantChunks.map(chunk => 
+            `[From: ${chunk.pdfName}]\n${chunk.text}\n`
+          ).join('\n')}`;
+          console.log('Found relevant context from Pinecone');
+        }
+      } catch (pineconeError) {
+        console.error('Pinecone search failed:', pineconeError);
+        // Continue without Pinecone context
+      }
+    }
 
     // If fileUrl is present, fetch the PDF, convert to base64, and send as inlineData to Gemini
     if (fileUrl && process.env.GEMINI_API_KEY) {
@@ -25,10 +43,16 @@ export async function POST(request: NextRequest) {
         }
         const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
         const pdfBase64 = pdfBuffer.toString('base64');
+        
+        // Include Pinecone context in the prompt
+        const enhancedMessage = contextFromPinecone 
+          ? `${message}\n\nAdditional context:${contextFromPinecone}`
+          : message;
+          
         const contents = [
           {
             parts: [
-              { text: message },
+              { text: enhancedMessage },
               {
                 inlineData: {
                   mimeType: 'application/pdf',
@@ -57,11 +81,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If no fileUrl or Gemini fails, fallback to OpenAI/Gemini as before
+    // If no fileUrl or Gemini fails, try with Pinecone context
     if (!aiResponse) {
       // Try OpenAI first
       if (process.env.OPENAI_API_KEY) {
         try {
+          const enhancedMessage = contextFromPinecone 
+            ? `${message}\n\nAdditional context:${contextFromPinecone}`
+            : message;
+            
           const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -71,8 +99,13 @@ export async function POST(request: NextRequest) {
             body: JSON.stringify({
               model: 'gpt-3.5-turbo',
               messages: [
-                { role: 'system', content: 'You are a helpful assistant.' },
-                { role: 'user', content: message },
+                { 
+                  role: 'system', 
+                  content: contextFromPinecone 
+                    ? 'You are a helpful assistant with access to the user\'s documents. Use the provided context to give accurate and relevant answers.'
+                    : 'You are a helpful assistant.'
+                },
+                { role: 'user', content: enhancedMessage },
               ],
               max_tokens: 512,
             }),
@@ -93,13 +126,17 @@ export async function POST(request: NextRequest) {
       // If OpenAI failed, try Gemini text-only
       if (!aiResponse && process.env.GEMINI_API_KEY) {
         try {
+          const enhancedMessage = contextFromPinecone 
+            ? `${message}\n\nAdditional context:${contextFromPinecone}`
+            : message;
+            
           const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `You are a helpful AI assistant. Please respond to: ${message}` }] }]
+              contents: [{ parts: [{ text: `You are a helpful AI assistant. Please respond to: ${enhancedMessage}` }] }]
             }),
           });
 
