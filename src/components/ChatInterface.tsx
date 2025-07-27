@@ -10,6 +10,8 @@ interface Message {
   text: string;
   isUser: boolean;
   time: string;
+  usedPinecone?: boolean;
+  pineconeChunks?: number;
 }
 
 export default function ChatInterface() {
@@ -123,7 +125,9 @@ export default function ChatInterface() {
           id: (nowAI.getTime() + 1).toString(),
           text: data.response,
           isUser: false,
-          time: nowAI.toLocaleTimeString([], { hour12: false })
+          time: nowAI.toLocaleTimeString([], { hour12: false }),
+          usedPinecone: data.usedPinecone,
+          pineconeChunks: data.pineconeChunks
         };
         setMessages(prev => [...prev, aiMessage]);
         setStatus('');
@@ -195,9 +199,9 @@ export default function ChatInterface() {
         <div className="bg-white rounded-lg shadow-md h-[600px] flex flex-col">
           {/* Chat Header */}
           <div className="p-4 border-b border-gray-200">
-            <h3 className="font-semibold">AI Chat</h3>
+            <h3 className="font-semibold">AI Chat with Pinecone</h3>
             <p className="text-sm text-gray-500">
-              Ask anything and get instant answers from OpenAI or Gemini.
+              Ask questions about your uploaded documents. AI will search Pinecone for relevant context.
             </p>
           </div>
 
@@ -218,6 +222,12 @@ export default function ChatInterface() {
                       <p className="text-sm">{message.text}</p>
                     ) : (
                       <div className="text-sm prose prose-sm max-w-none">
+                        {/* Pinecone Indicator */}
+                        {message.usedPinecone && (
+                          <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                            🔍 <strong>Using Pinecone Context</strong> - Answer based on {message.pineconeChunks} document sections
+                          </div>
+                        )}
                         <ReactMarkdown
                           components={{
                             h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,

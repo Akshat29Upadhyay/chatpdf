@@ -20,12 +20,15 @@ export async function POST(request: NextRequest) {
     // Try to get relevant context from Pinecone first
     if (process.env.PINECONE_API_KEY) {
       try {
-        const relevantChunks = await searchChunks(message, userId, 3);
+        const relevantChunks = await searchChunks(message, userId, 5);
         if (relevantChunks.length > 0) {
-          contextFromPinecone = `\n\nRelevant information from your documents:\n${relevantChunks.map(chunk => 
-            `[From: ${chunk.pdfName}]\n${chunk.text}\n`
-          ).join('\n')}`;
-          console.log('Found relevant context from Pinecone');
+          contextFromPinecone = `\n\nRelevant information from your documents:\n${relevantChunks.map((chunk, index) => 
+            `[Document: ${chunk.pdfName} - Section ${index + 1}]\n${chunk.text}\n`
+          ).join('\n---\n')}`;
+          console.log(`🔍 Found ${relevantChunks.length} relevant chunks from Pinecone for query: "${message}"`);
+          console.log(`📄 Documents referenced: ${[...new Set(relevantChunks.map(chunk => chunk.pdfName))].join(', ')}`);
+        } else {
+          console.log(`❌ No relevant chunks found in Pinecone for query: "${message}"`);
         }
       } catch (pineconeError) {
         console.error('Pinecone search failed:', pineconeError);
@@ -44,9 +47,15 @@ export async function POST(request: NextRequest) {
         const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
         const pdfBase64 = pdfBuffer.toString('base64');
         
-        // Include Pinecone context in the prompt
+        // Include Pinecone context in the prompt with better structure
         const enhancedMessage = contextFromPinecone 
-          ? `${message}\n\nAdditional context:${contextFromPinecone}`
+          ? `Question: ${message}
+
+Based on the following information from your uploaded documents, please provide a comprehensive answer:
+
+${contextFromPinecone}
+
+Please answer the question using the information provided above. If the information is not sufficient, please say so.`
           : message;
           
         const contents = [
@@ -87,7 +96,13 @@ export async function POST(request: NextRequest) {
       if (process.env.OPENAI_API_KEY) {
         try {
           const enhancedMessage = contextFromPinecone 
-            ? `${message}\n\nAdditional context:${contextFromPinecone}`
+            ? `Question: ${message}
+
+Based on the following information from your uploaded documents, please provide a comprehensive answer:
+
+${contextFromPinecone}
+
+Please answer the question using the information provided above. If the information is not sufficient, please say so.`
             : message;
             
           const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -102,8 +117,8 @@ export async function POST(request: NextRequest) {
                 { 
                   role: 'system', 
                   content: contextFromPinecone 
-                    ? 'You are a helpful assistant with access to the user\'s documents. Use the provided context to give accurate and relevant answers.'
-                    : 'You are a helpful assistant.'
+                    ? 'You are a helpful AI assistant with access to the user\'s uploaded documents. Your primary role is to answer questions based on the information provided in the context. Always prioritize information from the user\'s documents when answering. If the context doesn\'t contain enough information to answer the question, clearly state that. Be accurate, helpful, and cite specific information from the documents when possible.'
+                    : 'You are a helpful AI assistant.'
                 },
                 { role: 'user', content: enhancedMessage },
               ],
@@ -127,7 +142,13 @@ export async function POST(request: NextRequest) {
       if (!aiResponse && process.env.GEMINI_API_KEY) {
         try {
           const enhancedMessage = contextFromPinecone 
-            ? `${message}\n\nAdditional context:${contextFromPinecone}`
+            ? `Question: ${message}
+
+Based on the following information from your uploaded documents, please provide a comprehensive answer:
+
+${contextFromPinecone}
+
+Please answer the question using the information provided above. If the information is not sufficient, please say so.`
             : message;
             
           const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
@@ -136,7 +157,15 @@ export async function POST(request: NextRequest) {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `You are a helpful AI assistant. Please respond to: ${enhancedMessage}` }] }]
+              contents: [{ 
+                parts: [{ 
+                  text: contextFromPinecone 
+                    ? `You are a helpful AI assistant with access to the user's uploaded documents. Your primary role is to answer questions based on the information provided in the context. Always prioritize information from the user's documents when answering. If the context doesn't contain enough information to answer the question, clearly state that. Be accurate, helpful, and cite specific information from the documents when possible.
+
+${enhancedMessage}`
+                    : `You are a helpful AI assistant. Please respond to: ${enhancedMessage}`
+                }] 
+              }]
             }),
           });
 
@@ -158,7 +187,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ response: "Sorry, I couldn't answer that right now. Please try again later." });
     }
 
-    return NextResponse.json({ response: aiResponse, timestamp: new Date().toISOString() });
+    // Return response with metadata about Pinecone usage
+    return NextResponse.json({ 
+      response: aiResponse, 
+      timestamp: new Date().toISOString(),
+      usedPinecone: contextFromPinecone.length > 0,
+      pineconeChunks: contextFromPinecone.length > 0 ? contextFromPinecone.split('---').length - 1 : 0
+    });
 
   } catch (error) {
     console.error('Chat API error:', error);
